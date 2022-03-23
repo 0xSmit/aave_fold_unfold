@@ -20,9 +20,17 @@ async function main() {
   console.log(`Deploying on ${name} chainId: ${chainId} with lending address ${lendingAddress}`);
 
   const FlashLoanFactory = await ethers.getContractFactory('FlashloanV2', signer);
-  const FlashLoan = await FlashLoanFactory.deploy(lendingAddress);
+  const FlashLoanWindFactory = await ethers.getContractFactory('FlashloanWind', signer);
+  const FlashLoanUnwindFactory = await ethers.getContractFactory('FlashloanUnwind', signer);
 
+  const FlashLoan = await FlashLoanFactory.deploy(lendingAddress);
   console.log(`FlashLoan Contract deployed at : ${FlashLoan.address}`);
+
+  const Wind = await FlashLoanWindFactory.deploy(lendingAddress);
+  console.log(`Wind Contract deployed at : ${Wind.address}`);
+
+  const Unwind = await FlashLoanUnwindFactory.deploy(lendingAddress);
+  console.log(`Unwind Contract deployed at : ${Unwind.address}`);
 }
 
 main().catch((error) => {
