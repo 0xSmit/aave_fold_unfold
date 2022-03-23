@@ -6,11 +6,21 @@
     "esModuleInterop": true,
     "outDir": "dist",
     "declaration": true,
+    "baseUrl": ".",
     "paths": {
-      "interfaces/*": ["./interfaces/*"],
-      "libraries/*": ["./libraries/*"]
+      "*": ["/*"],
+      "interfaces/*": ["interfaces/*"],
+      "libraries/*": ["libraries/*"]
     }
   },
-  "include": ["./scripts", "./test", "./typechain"],
+  "include": [
+    "./scripts",
+    "./test",
+    "./typechain",
+    "./interfaces/*",
+    "./libraries/*",
+    "./contracts/*"
+  ],
+  "exclude": ["node_modules"],
   "files": ["./hardhat.config.ts"]
 }

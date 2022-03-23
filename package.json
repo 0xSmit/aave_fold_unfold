@@ -41,6 +41,5 @@
     "typechain": "^5.2.0",
     "typescript": "^4.6.2",
     "@openzeppelin/contracts": "3.1.0"
-  },
-  "dependencies": {}
+  }
 }

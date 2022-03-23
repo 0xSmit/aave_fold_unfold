@@ -119,8 +119,10 @@ contract FlashloanUnwind is FlashLoanReceiverBaseV2, Withdrawable {
         address receiverAddress = address(this);
 
         address[] memory assets = new address[](1);
+        assets[0] = _asset;
         // LENDING_POOL.flashLoan(receiverAddress, assets, amounts, modes, onBehalfOf, params, referralCode);
-        assets[0] = setAsset(_asset);
+        assets[0] = setAsset(
+            _asset);
         LTV = setLTV(_LTV);
 
         uint256[] memory amounts = new uint256[](1);
