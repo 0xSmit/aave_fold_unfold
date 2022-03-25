@@ -106,19 +106,16 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
         LENDING_POOL.repay(asset, debtToRepay, uint256(1), onBehalfOf);
 
         // Withdraw collateral
-        uint256 collateralAmount = uint256(-1); // -1 to withdraw all collateral
-        address to = onBehalfOf;
-        LENDING_POOL.withdraw(assets[0], collateralAmount, to);
+        uint256 collateralAmount = debtToRepay.add(premium); // -1 to withdraw all collateral
+        LENDING_POOL.withdraw(asset, collateralAmount, onBehalfOf);
 
         // Using collateral, pay back flash loan
 
         // At end, contract owes flashloaned amounts + premiums
         // Need to ensure enough contract has enough to repay amounts
 
-        for (uint256 i = 0; i < assets.length; i++) {
-            uint256 amountOwing = amounts[i].add(premiums[i]);
-            IERC20(assets[i]).approve(address(LENDING_POOL), amountOwing);
-        }
+        //Grant allowance to leanding pool to sweep funds
+        grantAllowance(asset, address(LENDING_POOL), collateralAmount);
         return true;
     }
 
