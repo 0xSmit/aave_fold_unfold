@@ -4,14 +4,12 @@ pragma solidity ^0.6.12;
 import "./aave/FlashLoanReceiverBaseV2.sol";
 import "interfaces/v2/ILendingPoolAddressesProviderV2.sol";
 import "interfaces/v2/ILendingPoolV2.sol";
+import "hardhat/console.sol";
 
 contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
-    address public immutable receiverAddress;
     uint256[] private modes = [uint256(0)];
 
-    constructor(address _addressProvider) public FlashLoanReceiverBaseV2(_addressProvider) {
-        receiverAddress = address(this);
-    }
+    constructor(address _addressProvider) public FlashLoanReceiverBaseV2(_addressProvider) {}
 
     function foldPosition(
         address asset,
@@ -24,7 +22,7 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
 
         bytes memory params = abi.encode(inputAmount, LTV, behalfAddress, uint8(1));
 
-        LENDING_POOL.flashLoan(receiverAddress, assets, loanAmount, modes, behalfAddress, params, uint16(0));
+        LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, behalfAddress, params, uint16(0));
     }
 
     function unFoldPosition(
@@ -38,7 +36,7 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
 
         bytes memory params = abi.encode(debtToRepay, LTV, behalfAddress, uint8(2));
 
-        LENDING_POOL.flashLoan(receiverAddress, assets, loanAmount, modes, behalfAddress, params, uint16(0));
+        LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, behalfAddress, params, uint16(0));
     }
 
     function executeOperation(
@@ -50,6 +48,14 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
     ) external override returns (bool) {
         // Received Flash loan
         (uint256 inputAmount, uint256 LTV, address onBehalfOf, uint8 txType) = abi.decode(params, (uint256, uint256, address, uint8));
+
+        console.log("executeOp:inputAmount:", inputAmount);
+        console.log("executeOp:LTV:", LTV);
+        console.log("executeOp:onBehalfOf:", onBehalfOf);
+        console.log("executeOp:txType:", txType);
+        console.log("executeOp:asset", assets[0]);
+        console.log("executeOp:amount", amounts[0]);
+        console.log("executeOp:premium", premiums[0]);
 
         // FOLD
         if (txType == uint8(1)) {
@@ -72,24 +78,35 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
         //Receive the input tokens to self Address
         transferTokensToSelf(asset, onBehalfOf, inputAmount);
 
+        uint256 amountOwed = flashAmount.add(premium);
+        console.log("_foldInternal:amountOwed", amountOwed);
+
         //AmtToLend = flahLoanAmount + initialInput amount from user
         uint256 lendAmount = flashAmount.add(inputAmount).sub(premium);
+        console.log("_foldInternal:lendAmount", lendAmount);
 
         grantAllowance(asset, address(LENDING_POOL), lendAmount);
 
+        //Lend the amount to Lending Pool
         LENDING_POOL.deposit(asset, lendAmount, onBehalfOf, uint16(0));
+        console.log("_foldInternal:", "Deposit Successful");
 
-        // Borrow (x+y)*LTV tokens
-        uint256 borrowAmount = lendAmount.mul(LTV).div(100);
-        LENDING_POOL.borrow(asset, borrowAmount, uint256(1), uint16(0), onBehalfOf);
+        // Borrow the amount of tokens taken as flash loan - premium
+        uint256 borrowAmount = amountOwed.sub(premium);
+        console.log("_foldInternal:borrowAmount", borrowAmount);
+        LENDING_POOL.borrow(asset, borrowAmount, uint256(2), uint16(0), onBehalfOf);
+        console.log("_foldInternal:", "Borrow Successful");
 
         // Pay back flash loan
         // Should have (x+y) collateral, y debt with net interest rate ((x+y)*(deposit rate) - (y)*(borrowing rate))%
 
-        uint256 amountOwed = flashAmount.add(premium);
-
         //Grant allowance to leanding pool to sweep funds
         grantAllowance(asset, address(LENDING_POOL), amountOwed);
+
+        //balance of current contract
+        uint256 contractBalance = IERC20(asset).balanceOf(address(this));
+        console.log("_foldInternal:contractBalance", contractBalance);
+
         return true;
     }
 
