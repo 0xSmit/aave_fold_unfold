@@ -7,7 +7,8 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import { IFlashLoanReceiverV2 } from "interfaces/v2/IFlashLoanReceiverV2.sol";
 import { ILendingPoolAddressesProviderV2 } from "interfaces/v2/ILendingPoolAddressesProviderV2.sol";
 import { ILendingPoolV2 } from "interfaces/v2/ILendingPoolV2.sol";
-import "../../utils/Withdrawable.sol";
+
+// import "../../utils/Withdrawable.sol";
 
 /** 
     !!!
@@ -27,5 +28,6 @@ abstract contract FlashLoanReceiverBaseV2 is IFlashLoanReceiverV2 {
         LENDING_POOL = ILendingPoolV2(ILendingPoolAddressesProviderV2(provider).getLendingPool());
     }
 
+    //solhint-disable no-empty-blocks
     receive() external payable {}
 }

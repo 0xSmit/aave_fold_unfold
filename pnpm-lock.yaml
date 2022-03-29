@@ -26,6 +26,7 @@ specifiers:
   ethers: ^5.6.1
   hardhat: ^2.9.1
   hardhat-gas-reporter: ^1.0.8
+  hardhat-log-remover: ^2.0.2
   prettier: ^2.6.0
   prettier-plugin-solidity: ^1.0.0-beta.13
   solhint: ^3.3.7
@@ -60,6 +61,7 @@ devDependencies:
   ethers: 5.6.1
   hardhat: 2.9.1
   hardhat-gas-reporter: 1.0.8_hardhat@2.9.1
+  hardhat-log-remover: 2.0.2_hardhat@2.9.1
   prettier: 2.6.0
   prettier-plugin-solidity: 1.0.0-beta.19_prettier@2.6.0
   solhint: 3.3.7
@@ -5079,6 +5081,14 @@ packages:
       sha1: 1.1.1
     transitivePeerDependencies:
       - '@codechecks/client'
+    dev: true
+
+  /hardhat-log-remover/2.0.2_hardhat@2.9.1:
+    resolution: {integrity: sha512-TvEWOisQmZUZ7Mlb7s4XYS/MxgZzjFJSjDI8v3uTcrD6aaXy1QtomW6D6WNsISEWtwwRlSntOGpHQwFjrz2MCw==}
+    peerDependencies:
+      hardhat: ^2.0.0
+    dependencies:
+      hardhat: 2.9.1
     dev: true
 
   /hardhat/2.9.1:

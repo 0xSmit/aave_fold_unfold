@@ -9,42 +9,41 @@ import "interfaces/v2/ILendingPoolV2.sol";
 import { DataTypes } from "libraries/v2/DataTypes.sol";
 import "hardhat/console.sol";
 
-contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
+contract AaveFold is FlashLoanReceiverBaseV2 {
     uint256[] private modes = [uint256(0)];
 
+    //solhint-disable no-empty-blocks
     constructor(address _addressProvider) public FlashLoanReceiverBaseV2(_addressProvider) {}
 
     function foldPosition(
         address asset,
         uint256 inputAmount,
-        uint256 LTV,
-        address behalfAddress
+        uint256 LTV
     ) external nonZero(inputAmount) {
         (address[] memory assets, uint256[] memory loanAmount) = (new address[](1), new uint256[](1));
         (assets[0], loanAmount[0]) = (asset, getLoanAmount(inputAmount, LTV));
 
-        bytes memory params = abi.encode(uint8(1), behalfAddress, inputAmount, LTV);
+        bytes memory params = abi.encode(uint8(1), msg.sender, inputAmount);
 
-        LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, behalfAddress, params, uint16(0));
+        LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, msg.sender, params, uint16(0));
     }
 
-    function unFoldPosition(address asset, address behalfAddress) external {
+    function unFoldPosition(address asset) external {
         (address[] memory assets, uint256[] memory loanAmount) = (new address[](1), new uint256[](1));
-        // assets[0] = asset;
 
         //get debt address
         DataTypes.ReserveData memory ReserveData = LENDING_POOL.getReserveData(asset);
         console.log("unfoldPosition:VarTokenAddress", ReserveData.variableDebtTokenAddress);
 
         //get total user debt
-        uint256 totalDebt = IERC20(ReserveData.variableDebtTokenAddress).balanceOf(behalfAddress);
+        uint256 totalDebt = IERC20(ReserveData.variableDebtTokenAddress).balanceOf(msg.sender);
         console.log("unfoldPosition:totalDebt", totalDebt);
 
         (assets[0], loanAmount[0]) = (asset, totalDebt);
 
-        bytes memory params = abi.encode(uint8(2), behalfAddress, totalDebt, uint256(0));
+        bytes memory params = abi.encode(uint8(2), msg.sender, totalDebt, uint256(0));
 
-        LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, behalfAddress, params, uint16(0));
+        LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, msg.sender, params, uint16(0));
     }
 
     function executeOperation(
@@ -55,7 +54,9 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
         bytes memory params
     ) external override returns (bool) {
         // Received Flash loan
-        (uint8 txType, address onBehalfOf, uint256 inputAmount, uint256 LTV) = abi.decode(params, (uint8, address, uint256, uint256));
+        // (uint8 txType, address onBehalfOf, uint256 inputAmount, uint256 LTV) = abi.decode(params, (uint8, address, uint256, uint256));
+
+        (uint8 txType, address onBehalfOf, uint256 inputAmount) = abi.decode(params, (uint8, address, uint256));
 
         console.log("executeOp:inputAmount:", inputAmount);
         console.log("executeOp:onBehalfOf:", onBehalfOf);
@@ -66,7 +67,7 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
 
         // FOLD
         if (txType == uint8(1)) {
-            return _foldInternal(assets[0], inputAmount, LTV, onBehalfOf, amounts[0], premiums[0]);
+            return _foldInternal(assets[0], inputAmount, onBehalfOf, amounts[0], premiums[0]);
         }
         // UNFOLD
         else if (txType == uint8(2)) {
@@ -77,7 +78,6 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
     function _foldInternal(
         address asset,
         uint256 inputAmount,
-        uint256 LTV,
         address onBehalfOf,
         uint256 flashAmount,
         uint256 premium

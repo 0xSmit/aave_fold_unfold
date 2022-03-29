@@ -36,6 +36,7 @@
     "ethers": "^5.6.1",
     "hardhat": "^2.9.1",
     "hardhat-gas-reporter": "^1.0.8",
+    "hardhat-log-remover": "^2.0.2",
     "prettier": "^2.6.0",
     "prettier-plugin-solidity": "^1.0.0-beta.13",
     "solhint": "^3.3.7",
