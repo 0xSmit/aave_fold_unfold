@@ -9,6 +9,7 @@ const AAVE_LENDING_ADDRESSES: { [chainId: number]: Address } = {
 };
 
 const debtTokenABI = ['function approveDelegation(address delegatee, uint256 amount)'];
+const aTokenABI = ['function approve(address spender, uint256 amount)'];
 
 async function main() {
     const { chainId, name } = await ethers.provider.getNetwork();
@@ -43,6 +44,28 @@ async function main() {
         })
     ).wait();
     console.log(`DAI DEBT Approved to ${foldContract.address}`);
+
+    const AToken = new ethers.Contract('0x27F8D03b3a2196956ED754baDc28D73be8830A6e', aTokenABI, signer);
+
+    const approve = await AToken.approve(foldContract.address, ethers.constants.MaxUint256, {
+        gasPrice: ethers.utils.parseUnits('50', 'gwei'),
+    });
+    await approve.wait();
+    console.log(`AToken Approved to ${foldContract.address}`);
+
+    console.log('Folding Position for $1');
+    const fold = await foldContract.foldPosition(DAIToken.address, ethers.utils.parseEther('1'), 50, signer.address, {
+        gasPrice: ethers.utils.parseUnits('50', 'gwei'),
+    });
+
+    await fold.wait();
+    console.log('Fold Position Completed');
+
+    console.log('Unfolding Position');
+
+    foldContract.unFoldPosition(DAIToken.address, signer.address);
+
+    console.log('Unfold Position Completed');
 }
 
 main().catch((error) => {

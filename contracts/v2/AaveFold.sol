@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: UNLICENCED
 pragma solidity ^0.6.12;
 
+pragma experimental ABIEncoderV2;
+
 import "./aave/FlashLoanReceiverBaseV2.sol";
 import "interfaces/v2/ILendingPoolAddressesProviderV2.sol";
 import "interfaces/v2/ILendingPoolV2.sol";
+import { DataTypes } from "libraries/v2/DataTypes.sol";
 import "hardhat/console.sol";
 
 contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
@@ -20,21 +23,26 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
         (address[] memory assets, uint256[] memory loanAmount) = (new address[](1), new uint256[](1));
         (assets[0], loanAmount[0]) = (asset, getLoanAmount(inputAmount, LTV));
 
-        bytes memory params = abi.encode(inputAmount, LTV, behalfAddress, uint8(1));
+        bytes memory params = abi.encode(uint8(1), behalfAddress, inputAmount, LTV);
 
         LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, behalfAddress, params, uint16(0));
     }
 
-    function unFoldPosition(
-        address asset,
-        uint256 debtToRepay,
-        uint256 LTV,
-        address behalfAddress
-    ) external nonZero(debtToRepay) {
+    function unFoldPosition(address asset, address behalfAddress) external {
         (address[] memory assets, uint256[] memory loanAmount) = (new address[](1), new uint256[](1));
-        (assets[0], loanAmount[0]) = (asset, debtToRepay);
+        // assets[0] = asset;
 
-        bytes memory params = abi.encode(debtToRepay, LTV, behalfAddress, uint8(2));
+        //get debt address
+        DataTypes.ReserveData memory ReserveData = LENDING_POOL.getReserveData(asset);
+        console.log("unfoldPosition:VarTokenAddress", ReserveData.variableDebtTokenAddress);
+
+        //get total user debt
+        uint256 totalDebt = IERC20(ReserveData.variableDebtTokenAddress).balanceOf(behalfAddress);
+        console.log("unfoldPosition:totalDebt", totalDebt);
+
+        (assets[0], loanAmount[0]) = (asset, totalDebt);
+
+        bytes memory params = abi.encode(uint8(2), behalfAddress, totalDebt, uint256(0));
 
         LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, behalfAddress, params, uint16(0));
     }
@@ -47,14 +55,13 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
         bytes memory params
     ) external override returns (bool) {
         // Received Flash loan
-        (uint256 inputAmount, uint256 LTV, address onBehalfOf, uint8 txType) = abi.decode(params, (uint256, uint256, address, uint8));
+        (uint8 txType, address onBehalfOf, uint256 inputAmount, uint256 LTV) = abi.decode(params, (uint8, address, uint256, uint256));
 
         console.log("executeOp:inputAmount:", inputAmount);
-        console.log("executeOp:LTV:", LTV);
         console.log("executeOp:onBehalfOf:", onBehalfOf);
         console.log("executeOp:txType:", txType);
         console.log("executeOp:asset", assets[0]);
-        console.log("executeOp:amount", amounts[0]);
+        console.log("executeOp:loanReceived", amounts[0]);
         console.log("executeOp:premium", premiums[0]);
 
         // FOLD
@@ -63,7 +70,7 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
         }
         // UNFOLD
         else if (txType == uint8(2)) {
-            return _unfoldInternal(assets[0], inputAmount, LTV, onBehalfOf, amounts[0], premiums[0]);
+            return _unfoldInternal(assets[0], inputAmount, onBehalfOf, amounts[0], premiums[0]);
         }
     }
 
@@ -83,56 +90,72 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
 
         //AmtToLend = flahLoanAmount + initialInput amount from user
         uint256 lendAmount = flashAmount.add(inputAmount).sub(premium);
-        console.log("_foldInternal:lendAmount", lendAmount);
+        console.log("_foldInternal:amountToLend", lendAmount);
 
         grantAllowance(asset, address(LENDING_POOL), lendAmount);
 
-        //Lend the amount to Lending Pool
         LENDING_POOL.deposit(asset, lendAmount, onBehalfOf, uint16(0));
         console.log("_foldInternal:", "Deposit Successful");
 
-        // Borrow the amount of tokens taken as flash loan - premium
-        uint256 borrowAmount = amountOwed.sub(premium);
-        console.log("_foldInternal:borrowAmount", borrowAmount);
+        // Borrow (x+y)*LTV tokens
+        uint256 borrowAmount = amountOwed;
+        console.log("_foldInternal:amountToBorrow", borrowAmount);
         LENDING_POOL.borrow(asset, borrowAmount, uint256(2), uint16(0), onBehalfOf);
         console.log("_foldInternal:", "Borrow Successful");
 
         // Pay back flash loan
         // Should have (x+y) collateral, y debt with net interest rate ((x+y)*(deposit rate) - (y)*(borrowing rate))%
-
-        //Grant allowance to leanding pool to sweep funds
         grantAllowance(asset, address(LENDING_POOL), amountOwed);
 
-        //balance of current contract
-        uint256 contractBalance = IERC20(asset).balanceOf(address(this));
-        console.log("_foldInternal:contractBalance", contractBalance);
+        uint256 balanceLeft = IERC20(asset).balanceOf(address(this));
+        console.log("_foldInternal:balanceLeft", balanceLeft);
 
+        //Grant allowance to leanding pool to sweep funds
         return true;
     }
 
     function _unfoldInternal(
         address asset,
         uint256 debtToRepay,
-        uint256 LTV,
         address onBehalfOf,
         uint256 flashAmount,
         uint256 premium
     ) private returns (bool) {
         // Repay debt using flash loan
+        uint256 amountOwed = flashAmount.add(premium);
+        console.log("_unfoldInternal:amountOwed", amountOwed);
+
         grantAllowance(asset, address(LENDING_POOL), debtToRepay);
-        LENDING_POOL.repay(asset, debtToRepay, uint256(1), onBehalfOf);
+        LENDING_POOL.repay(asset, debtToRepay, uint256(2), onBehalfOf);
 
-        // Withdraw collateral
-        uint256 collateralAmount = debtToRepay.add(premium); // -1 to withdraw all collateral
-        LENDING_POOL.withdraw(asset, collateralAmount, onBehalfOf);
+        DataTypes.ReserveData memory ReserveData = LENDING_POOL.getReserveData(asset);
+        uint256 totalDebt = IERC20(ReserveData.variableDebtTokenAddress).balanceOf(onBehalfOf);
+        console.log("_unfoldInternal:totalDebtPendingAfterRepay", totalDebt);
 
-        // Using collateral, pay back flash loan
+        console.log("_unfoldInternal:aTokenAddress", ReserveData.aTokenAddress);
 
-        // At end, contract owes flashloaned amounts + premiums
-        // Need to ensure enough contract has enough to repay amounts
+        uint256 aTokenBalance = IERC20(ReserveData.aTokenAddress).balanceOf(onBehalfOf);
 
-        //Grant allowance to leanding pool to sweep funds
-        grantAllowance(asset, address(LENDING_POOL), collateralAmount);
+        console.log("_unfoldInternal:aTokenBalance", aTokenBalance);
+
+        transferTokensToSelf(ReserveData.aTokenAddress, onBehalfOf, aTokenBalance);
+
+        uint256 aTokensRcvBal = IERC20(ReserveData.aTokenAddress).balanceOf(address(this));
+        console.log("_unfoldInternal:aTokensRcvBal", aTokensRcvBal);
+
+        LENDING_POOL.withdraw(asset, type(uint256).max, address(this));
+
+        uint256 amountOfTokensRecv = IERC20(asset).balanceOf(address(this));
+        console.log("_unfoldInternal:amountOfTokensRecv", amountOfTokensRecv);
+
+        require(amountOwed <= amountOfTokensRecv, "E1");
+
+        uint256 amountToReturn = amountOfTokensRecv - amountOwed;
+
+        IERC20(asset).transfer(onBehalfOf, amountToReturn);
+
+        grantAllowance(asset, address(LENDING_POOL), amountOwed);
+
         return true;
     }
 
@@ -166,3 +189,5 @@ contract AaveFold is FlashLoanReceiverBaseV2, Withdrawable {
         _;
     }
 }
+
+//E1 - Not enough balance to repay flashloan

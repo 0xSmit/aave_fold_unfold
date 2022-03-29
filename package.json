@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "remix": "remixd -s . --remix-ide https://remix.ethereum.org"
   },
   "keywords": [],
   "author": "",
