@@ -54,7 +54,7 @@ async function main() {
     console.log(`AToken Approved to ${foldContract.address}`);
 
     console.log('Folding Position for $1');
-    const fold = await foldContract.foldPosition(DAIToken.address, ethers.utils.parseEther('1'), 50, signer.address, {
+    const fold = await foldContract.foldPosition(DAIToken.address, ethers.utils.parseEther('1'), 50, {
         gasPrice: ethers.utils.parseUnits('50', 'gwei'),
     });
 
@@ -63,7 +63,7 @@ async function main() {
 
     console.log('Unfolding Position');
 
-    foldContract.unFoldPosition(DAIToken.address, signer.address);
+    foldContract.unFoldPosition(DAIToken.address);
 
     console.log('Unfold Position Completed');
 }

@@ -31,31 +31,31 @@ async function main() {
     const ERC20 = await ethers.getContractFactory('ERC20', signer);
 
     const DAIToken = ERC20.attach('0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063');
-    // await (
-    //     await DAIToken.approve(foldContract.address, ethers.constants.MaxUint256, {
-    //         gasPrice: ethers.utils.parseUnits('50', 'gwei'),
-    //     })
-    // ).wait();
-    // console.log('Dai granted spending allowance to fold contract');
+    await (
+        await DAIToken.approve(foldContract.address, ethers.constants.MaxUint256, {
+            gasPrice: ethers.utils.parseUnits('50', 'gwei'),
+        })
+    ).wait();
+    console.log('Dai granted spending allowance to fold contract');
 
-    // const DAIDebtTokenVar = new ethers.Contract('0x75c4d1fb84429023170086f06e682dcbbf537b7d', debtTokenABI, signer);
-    // (
-    //     await DAIDebtTokenVar.approveDelegation(foldContract.address, ethers.constants.MaxUint256, {
-    //         gasPrice: ethers.utils.parseUnits('50', 'gwei'),
-    //     })
-    // ).wait();
-    // console.log(`DAI DEBT Approved to ${foldContract.address}`);
+    const DAIDebtTokenVar = new ethers.Contract('0x75c4d1fb84429023170086f06e682dcbbf537b7d', debtTokenABI, signer);
+    (
+        await DAIDebtTokenVar.approveDelegation(foldContract.address, ethers.constants.MaxUint256, {
+            gasPrice: ethers.utils.parseUnits('50', 'gwei'),
+        })
+    ).wait();
+    console.log(`DAI DEBT Approved to ${foldContract.address}`);
 
-    // const AToken = new ethers.Contract('0x27F8D03b3a2196956ED754baDc28D73be8830A6e', aTokenABI, signer);
+    const AToken = new ethers.Contract('0x27F8D03b3a2196956ED754baDc28D73be8830A6e', aTokenABI, signer);
 
-    // const approve = await AToken.approve(foldContract.address, ethers.constants.MaxUint256, {
-    // gasPrice: ethers.utils.parseUnits('50', 'gwei'),
-    // });
-    // await approve.wait();
-    // console.log(`AToken Approved to ${foldContract.address}`);
+    const approve = await AToken.approve(foldContract.address, ethers.constants.MaxUint256, {
+        gasPrice: ethers.utils.parseUnits('50', 'gwei'),
+    });
+    await approve.wait();
+    console.log(`AToken Approved to ${foldContract.address}`);
 
     console.log('Folding Position for $1');
-    const fold = await foldContract.foldPosition(DAIToken.address, ethers.utils.parseEther('1'), 50, signer.address, {
+    const fold = await foldContract.foldPosition(DAIToken.address, ethers.utils.parseEther('1'), 50, {
         gasPrice: ethers.utils.parseUnits('50', 'gwei'),
     });
 
@@ -64,7 +64,8 @@ async function main() {
 
     console.log('Unfolding Position');
 
-    foldContract.unFoldPosition(DAIToken.address, signer.address);
+    const unfold = await foldContract.unFoldPosition(DAIToken.address);
+    await unfold.wait();
 
     console.log('Unfold Position Completed');
 }
