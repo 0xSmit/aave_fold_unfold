@@ -83,7 +83,7 @@ contract AaveFold is FlashLoanReceiverBaseV2 {
         LENDING_POOL.deposit(asset, lendAmount, onBehalfOf, uint16(0));
 
         // Borrow (x+y)*LTV tokens
-        uint256 borrowAmount = amountOwed;
+        uint256 borrowAmount = amountOwed.sub(premium);
         LENDING_POOL.borrow(asset, borrowAmount, uint256(2), uint16(0), onBehalfOf);
 
         // Pay back flash loan
