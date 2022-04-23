@@ -19,7 +19,9 @@ interface IFlashLoanReceiverV2 {
         bytes calldata params
     ) external returns (bool);
 
-    function ADDRESSES_PROVIDER() external view returns (ILendingPoolAddressesProviderV2);
+    //solhint-disable-next-line
+    // function ADDRESSES_PROVIDER() external view returns (ILendingPoolAddressesProviderV2);
 
-    function LENDING_POOL() external view returns (ILendingPoolV2);
+    //solhint-disable-next-line
+    // function LENDING_POOL() external view returns (ILendingPoolV2);
 }

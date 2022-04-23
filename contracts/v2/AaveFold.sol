@@ -8,27 +8,34 @@ import "./aave/FlashLoanReceiverBaseV2.sol";
 import "interfaces/v2/ILendingPoolAddressesProviderV2.sol";
 import "interfaces/v2/ILendingPoolV2.sol";
 import { DataTypes } from "libraries/v2/DataTypes.sol";
+import { ILendingPoolV2 } from "interfaces/v2/ILendingPoolV2.sol";
 
 contract AaveFold is FlashLoanReceiverBaseV2 {
     //solhint-disable no-empty-blocks
-    constructor(address _addressProvider) public FlashLoanReceiverBaseV2(_addressProvider) {}
+    // constructor(address _addressProvider) public FlashLoanReceiverBaseV2(_addressProvider) {}
 
     function foldPosition(
         address asset,
         uint256 inputAmount,
-        uint256 foldedDebtAmount
+        uint256 foldedDebtAmount,
+        address protocolAddress
     ) external nonZero(inputAmount) {
         require(foldedDebtAmount > inputAmount, "E1");
+
+        ILendingPoolV2 LENDING_POOL = getLendingPool(protocolAddress);
+
         (address[] memory assets, uint256[] memory loanAmount, uint256[] memory modes) = (new address[](1), new uint256[](1), new uint256[](1));
         (assets[0], loanAmount[0], modes[0]) = (asset, foldedDebtAmount, uint256(0));
 
-        bytes memory params = abi.encode(uint8(1), msg.sender, inputAmount);
+        bytes memory params = abi.encode(uint8(1), msg.sender, inputAmount, protocolAddress);
 
         LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, msg.sender, params, uint16(0));
     }
 
-    function unFoldPosition(address asset) external {
+    function unFoldPosition(address asset, address protocolAddress) external {
         //get debt address
+        ILendingPoolV2 LENDING_POOL = getLendingPool(protocolAddress);
+
         DataTypes.ReserveData memory ReserveData = LENDING_POOL.getReserveData(asset);
 
         //get total user debt
@@ -37,7 +44,7 @@ contract AaveFold is FlashLoanReceiverBaseV2 {
         (address[] memory assets, uint256[] memory loanAmount, uint256[] memory modes) = (new address[](1), new uint256[](1), new uint256[](1));
         (assets[0], loanAmount[0], modes[0]) = (asset, totalDebt, uint256(0));
 
-        bytes memory params = abi.encode(uint8(2), msg.sender, totalDebt);
+        bytes memory params = abi.encode(uint8(2), msg.sender, totalDebt, protocolAddress);
 
         LENDING_POOL.flashLoan(address(this), assets, loanAmount, modes, msg.sender, params, uint16(0));
     }
@@ -51,15 +58,15 @@ contract AaveFold is FlashLoanReceiverBaseV2 {
     ) external override returns (bool) {
         // Received Flash loan
 
-        (uint8 txType, address onBehalfOf, uint256 inputAmount) = abi.decode(params, (uint8, address, uint256));
+        (uint8 txType, address onBehalfOf, uint256 inputAmount, address protocolAddress) = abi.decode(params, (uint8, address, uint256, address));
 
         // FOLD
         if (txType == uint8(1)) {
-            return _foldInternal(assets[0], inputAmount, onBehalfOf, amounts[0], premiums[0]);
+            return _foldInternal(assets[0], inputAmount, onBehalfOf, amounts[0], premiums[0], protocolAddress);
         }
         // UNFOLD
         else if (txType == uint8(2)) {
-            return _unfoldInternal(assets[0], inputAmount, onBehalfOf, amounts[0], premiums[0]);
+            return _unfoldInternal(assets[0], inputAmount, onBehalfOf, amounts[0], premiums[0], protocolAddress);
         }
     }
 
@@ -68,8 +75,11 @@ contract AaveFold is FlashLoanReceiverBaseV2 {
         uint256 inputAmount,
         address onBehalfOf,
         uint256 flashAmount,
-        uint256 premium
+        uint256 premium,
+        address protocolAddress
     ) private returns (bool) {
+        ILendingPoolV2 LENDING_POOL = getLendingPool(protocolAddress);
+
         //Receive the input tokens to self Address
         transferTokensToSelf(asset, onBehalfOf, inputAmount);
 
@@ -99,9 +109,13 @@ contract AaveFold is FlashLoanReceiverBaseV2 {
         uint256 debtToRepay,
         address onBehalfOf,
         uint256 flashAmount,
-        uint256 premium
+        uint256 premium,
+        address protocolAddress
     ) private returns (bool) {
         // Repay debt using flash loan
+
+        ILendingPoolV2 LENDING_POOL = getLendingPool(protocolAddress);
+
         uint256 amountOwed = flashAmount.add(premium);
 
         grantAllowance(asset, address(LENDING_POOL), debtToRepay);
@@ -134,6 +148,10 @@ contract AaveFold is FlashLoanReceiverBaseV2 {
     //     //input = 100 * inp / 100 - ltv
     //     return ((input.mul(uint256(100))).div(uint256(100).sub(LTV))).sub(input);
     // }
+
+    function getLendingPool(address _address) internal view returns (ILendingPoolV2) {
+        return ILendingPoolV2(ILendingPoolAddressesProviderV2(_address).getLendingPool());
+    }
 
     function grantAllowance(
         address asset,
